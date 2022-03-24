@@ -227,6 +227,7 @@
 1. [MODEL] Add bandit/window mask + ext door decals & tail details - @bouveng (Johan Bouveng)
 1. [PFD] Reimplement PFD with msfs-avionics framework for improved performance - @saschl (saschl#9432)
 1. [EIS] Implement display switching - @tracernz (Mike)
+1. [HYD] Removed ground spoiler group until animations are modified - @Crocket63
 
 ## 0.7.0
 
