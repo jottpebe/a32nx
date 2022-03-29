@@ -63,7 +63,7 @@ export class LinearDeviationIndicator extends DisplayComponent<LinearDeviationIn
 
              this.component.instance.style.transform = `translate3d(0px, ${pixelOffset}px, 0px)`;
 
-             const linearDeviationReadoutText = Math.round(Math.abs(deviation) / 100).toFixed(0).padStart(2, '0');
+             const linearDeviationReadoutText = Math.min(99, Math.round(Math.abs(deviation) / 100)).toFixed(0).padStart(2, '0');
 
              this.upperLinearDeviationReadout.instance.textContent = linearDeviationReadoutText;
              this.lowerLinearDeviationReadout.instance.textContent = linearDeviationReadoutText;
