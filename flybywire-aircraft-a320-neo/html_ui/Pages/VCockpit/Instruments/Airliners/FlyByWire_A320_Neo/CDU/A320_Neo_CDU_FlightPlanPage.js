@@ -399,7 +399,7 @@ class CDUFlightPlanPage {
                         }
                     // Waypoint with no alt constraint.
                     // In this case `altitudeConstraint is actually just the predictedAltitude`
-                    } else if (vnavPredictionsMapByWaypoint && !wp.legAltitude1 && !wp.legAltitudeDescription) {
+                    } else if (vnavPredictionsMapByWaypoint && !hasAltConstraint) {
                         if (verticalWaypoint && verticalWaypoint.altitude) {
                             altitudeConstraint = formatAltitudeOrLevel(verticalWaypoint.altitude);
                         } else {
