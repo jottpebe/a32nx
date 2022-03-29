@@ -8,11 +8,11 @@ import { VerticalProfileComputationParametersObserver } from '@fmgc/guidance/vna
 import { AtmosphericConditions } from '@fmgc/guidance/vnav/AtmosphericConditions';
 import { ManagedSpeedType, SpeedProfile } from '@fmgc/guidance/vnav/climb/SpeedProfile';
 import { DescentStrategy, IdleDescentStrategy } from '@fmgc/guidance/vnav/descent/DescentStrategy';
-import { BaseGeometryProfile } from '@fmgc/guidance/vnav/profile/BaseGeometryProfile';
 import { AltitudeConstraintType } from '@fmgc/guidance/lnav/legs';
 import { MathUtils } from '@shared/MathUtils';
 import { WindComponent } from '@fmgc/guidance/vnav/wind';
 import { TemporaryCheckpointSequence } from '@fmgc/guidance/vnav/profile/TemporaryCheckpointSequence';
+import { EngineModel } from '@fmgc/guidance/vnav/EngineModel';
 
 class FlapConfigurationProfile {
     static getBySpeed(speed: Knots): FlapConf {
@@ -67,7 +67,9 @@ export class ApproachPathBuilder {
         this.idleStrategy = new IdleDescentStrategy(this.observer, this.atmosphericConditions);
     }
 
-    computeApproachPath(profile: NavGeometryProfile, speedProfile: SpeedProfile, estimatedFuelOnBoardAtDestination: number, estimatedSecondsFromPresentAtDestination: number): TemporaryCheckpointSequence {
+    computeApproachPath(
+        profile: NavGeometryProfile, speedProfile: SpeedProfile, estimatedFuelOnBoardAtDestination: number, estimatedSecondsFromPresentAtDestination: number,
+    ): TemporaryCheckpointSequence {
         const { approachSpeed, managedDescentSpeedMach, zeroFuelWeight, tropoPause, destinationAirfieldElevation } = this.observer.get();
 
         const approachConstraints = profile.descentAltitudeConstraints.slice().reverse();
@@ -127,7 +129,7 @@ export class ApproachPathBuilder {
             sequence.copyLastCheckpoint({ reason: VerticalCheckpointReason.Decel });
         }
 
-        return sequence
+        return sequence;
     }
 
     private handleAltitudeConstraint(sequence: TemporaryCheckpointSequence, speedProfile: SpeedProfile, constraint: DescentAltitudeConstraint) {
@@ -225,7 +227,9 @@ export class ApproachPathBuilder {
      * @param targetDistanceFromStart
      * @returns
      */
-    private buildDecelerationPath(sequence: TemporaryCheckpointSequence, strategy: DescentStrategy, speedProfile: SpeedProfile, targetDistanceFromStart: NauticalMiles): TemporaryCheckpointSequence {
+    private buildDecelerationPath(
+        sequence: TemporaryCheckpointSequence, strategy: DescentStrategy, speedProfile: SpeedProfile, targetDistanceFromStart: NauticalMiles,
+    ): TemporaryCheckpointSequence {
         const decelerationSequence = new TemporaryCheckpointSequence(sequence.lastCheckpoint);
 
         const { managedDescentSpeedMach } = this.observer.get();
@@ -252,7 +256,7 @@ export class ApproachPathBuilder {
                 const remainingDistance = distanceFromStart - Math.max(speedConstraint.distanceFromStart, targetDistanceFromStart);
 
                 // Decelerate to constraint
-                const decelerationStep = strategy.predictToSpeedBackwards(
+                const decelerationStep = this.levelDecelerationSegment(
                     altitude,
                     speed,
                     speedConstraint.maxSpeed,
@@ -294,7 +298,7 @@ export class ApproachPathBuilder {
 
                 const targetSpeed = Math.min(flapTargetSpeed, speedTargetWithConstraints);
                 // flapTarget is constraining
-                const decelerationStep = strategy.predictToSpeedBackwards(
+                const decelerationStep = this.levelDecelerationSegment(
                     altitude,
                     speed,
                     targetSpeed,
@@ -317,6 +321,37 @@ export class ApproachPathBuilder {
         }
 
         return decelerationSequence;
+    }
+
+    // TODO: This should not be here.
+    // It assumes idle thrust, which is correct, but I am using a dynamic DescentStrategy everywhere in this class except here.
+    private levelDecelerationSegment(
+        finalAltitude: number, finalSpeed: Knots, speed: Knots, mach: Mach, fuelOnBoard: number, headwindComponent: WindComponent, config?: AircraftConfiguration,
+    ): StepResults {
+        const { zeroFuelWeight, tropoPause } = this.observer.get();
+        const actualMach = this.atmosphericConditions.computeMachFromCas(finalAltitude, (finalSpeed + speed) / 2);
+
+        const step = Predictions.speedChangeStep(
+            0,
+            finalAltitude,
+            speed,
+            finalSpeed,
+            mach,
+            mach,
+            EngineModel.getIdleN1(finalAltitude, actualMach),
+            zeroFuelWeight,
+            fuelOnBoard,
+            headwindComponent.value,
+            this.atmosphericConditions.isaDeviation,
+            tropoPause,
+            config.gearExtended,
+            config.flapConfig,
+        );
+
+        // Change this to the initial speed as it comes back as the final speed, but we are trying to compute the profile backwards
+        step.speed = speed;
+
+        return step;
     }
 
     private getFlapCheckpointReasonByFlapConf(flapConfig: FlapConf) {

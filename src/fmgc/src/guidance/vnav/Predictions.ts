@@ -374,6 +374,7 @@ export class Predictions {
 
     /**
      * THIS IS DONE.
+     * @param flightPathAngle flight path angle (in degrees) to fly the speed change step at
      * @param initialAltitude altitude at beginning of step, in feet
      * @param initialCAS airspeed at beginning of step
      * @param finalCAS airspeed at end of step
@@ -390,7 +391,7 @@ export class Predictions {
      * @param minimumAbsoluteAcceleration the minimum absolute acceleration before emitting TOO_LOW_DECELERATION (kts/s)
      */
     static speedChangeStep(
-        flightPahAngle: number,
+        flightPathAngle: number,
         initialAltitude: number,
         initialCAS: number,
         finalCAS: number,
@@ -443,7 +444,7 @@ export class Predictions {
 
         const weightEstimate = zeroFuelWeight + initialFuelWeight;
 
-        const pathAngleRadians = flightPahAngle * MathUtils.DEGREES_TO_RADIANS;
+        const pathAngleRadians = flightPathAngle * MathUtils.DEGREES_TO_RADIANS;
 
         let error: VnavStepError | null;
         let verticalSpeed: FeetPerMinute;
@@ -509,6 +510,7 @@ export class Predictions {
             timeElapsed: stepTime,
             distanceTraveled,
             fuelBurned,
+            initialAltitude,
             finalAltitude,
             error,
             speed: finalCAS,
