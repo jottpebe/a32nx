@@ -7,7 +7,7 @@ import { WindComponent } from '@fmgc/guidance/vnav/wind';
 import { VnavConfig } from '@fmgc/guidance/vnav/VnavConfig';
 import { HeadwindProfile } from '@fmgc/guidance/vnav/wind/HeadwindProfile';
 import { Predictions, StepResults } from '../Predictions';
-import { VerticalCheckpointReason } from '../profile/NavGeometryProfile';
+import { VerticalCheckpoint, VerticalCheckpointReason } from '../profile/NavGeometryProfile';
 import { BaseGeometryProfile } from '../profile/BaseGeometryProfile';
 import { AtmosphericConditions } from '../AtmosphericConditions';
 
@@ -125,11 +125,11 @@ export class ClimbPathBuilder {
 
                 // If we shoot through the final altitude trying to accelerate, pretend we didn't accelerate all the way
                 if (accelerationStep.finalAltitude > finalAltitude) {
-                    const scaling = (accelerationStep.finalAltitude - accelerationStep.initialAltitude) === 0
+                    const scaling = (accelerationStep.finalAltitude - accelerationStep.initialAltitude) !== 0
                         ? (finalAltitude - accelerationStep.initialAltitude) / (accelerationStep.finalAltitude - accelerationStep.initialAltitude)
                         : 0;
 
-                    this.scaleStep(accelerationStep, scaling);
+                    this.scaleStepBasedOnLastCheckpoint(profile.lastCheckpoint, accelerationStep, scaling);
                 }
 
                 this.addCheckpointFromStep(profile, accelerationStep, VerticalCheckpointReason.AtmosphericConditions);
@@ -177,6 +177,13 @@ export class ClimbPathBuilder {
             const step = speedTarget - speed < 1
                 ? climbStrategy.predictToAltitude(altitude, Math.min(altitude + 1500, targetAltitude), speedTarget, managedClimbSpeedMach, remainingFuelOnBoard, headwind)
                 : climbStrategy.predictToSpeed(altitude, speedTarget, speed, managedClimbSpeedMach, remainingFuelOnBoard, headwind);
+
+            if (step.finalAltitude - targetAltitude > 10) {
+                const scaling = (step.finalAltitude - step.initialAltitude) !== 0
+                    ? (targetAltitude - step.initialAltitude) / (step.finalAltitude - step.initialAltitude)
+                    : 0;
+                this.scaleStepBasedOnLastCheckpoint(profile.lastCheckpoint, step, scaling);
+            }
 
             this.addCheckpointFromStep(profile, step, VerticalCheckpointReason.AtmosphericConditions);
 
@@ -370,13 +377,12 @@ export class ClimbPathBuilder {
         }));
     }
 
-    // TODO: Rethink the existence of thsi
-    private scaleStep(step: StepResults, scaling: number) {
+    private scaleStepBasedOnLastCheckpoint(lastCheckpoint: VerticalCheckpoint, step: StepResults, scaling: number) {
         step.distanceTraveled *= scaling;
         step.fuelBurned *= scaling;
         step.timeElapsed *= scaling;
-        step.finalAltitude *= scaling;
-        step.speed *= scaling;
+        step.finalAltitude = (1 - scaling) * lastCheckpoint.altitude + scaling * step.initialAltitude;
+        step.speed = (1 - scaling) * lastCheckpoint.speed + scaling * step.speed;
     }
 }
 
