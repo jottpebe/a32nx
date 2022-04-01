@@ -23,6 +23,7 @@ import { ConstraintReader } from '@fmgc/guidance/vnav/ConstraintReader';
 import { FmgcFlightPhase } from '@shared/flightphase';
 import { TacticalDescentPathBuilder } from '@fmgc/guidance/vnav/descent/TacticalDescentPathBuilder';
 import { IdleDescentStrategy } from '@fmgc/guidance/vnav/descent/DescentStrategy';
+import { LatchedDescentGuidance } from '@fmgc/guidance/vnav/descent/LatchedDescentGuidance';
 import { DescentGuidance } from '@fmgc/guidance/vnav/descent/DescentGuidance';
 import { ProfileInterceptCalculator } from '@fmgc/guidance/vnav/descent/ProfileInterceptCalculator';
 import { ApproachPathBuilder } from '@fmgc/guidance/vnav/descent/ApproachPathBuilder';
@@ -81,7 +82,7 @@ export class VnavDriver implements GuidanceComponent {
 
     private aircraftToDescentProfileRelation: AircraftToDescentProfileRelation;
 
-    private descentGuidance: DescentGuidance;
+    private descentGuidance: DescentGuidance | LatchedDescentGuidance;
 
     private headingProfile: NavHeadingProfile;
 
@@ -110,7 +111,9 @@ export class VnavDriver implements GuidanceComponent {
         this.constraintReader = new ConstraintReader(this.flightPlanManager);
 
         this.aircraftToDescentProfileRelation = new AircraftToDescentProfileRelation(this.computationParametersObserver);
-        this.descentGuidance = new DescentGuidance(this.aircraftToDescentProfileRelation, computationParametersObserver, this.atmosphericConditions);
+        this.descentGuidance = VnavConfig.VNAV_USE_LATCHED_DESCENT_MODE
+            ? new LatchedDescentGuidance(this.aircraftToDescentProfileRelation, computationParametersObserver, this.atmosphericConditions)
+            : new DescentGuidance(this.aircraftToDescentProfileRelation, computationParametersObserver, this.atmosphericConditions);
     }
 
     init(): void {
