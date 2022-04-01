@@ -115,6 +115,11 @@ export class ApproachPathBuilder {
         // Assume idle thrust from there
         for (const altitudeConstraint of approachConstraints) {
             this.handleAltitudeConstraint(sequence, speedProfile, altitudeConstraint);
+
+            // If you're at or above your descent speed (taking speed limit into account, place the decel point)
+            if (sequence.lastCheckpoint.speed - speedProfile.getTargetWithoutConstraints(sequence.lastCheckpoint.altitude, ManagedSpeedType.Descent) > -1) {
+                break;
+            }
         }
 
         const speedTarget = speedProfile.getTarget(sequence.lastCheckpoint.distanceFromStart, sequence.lastCheckpoint.altitude, ManagedSpeedType.Descent);
@@ -188,10 +193,9 @@ export class ApproachPathBuilder {
         }
 
         sequence.push(...decelerationSequence.get());
-        const currentSpeedTarget = speedProfile.getTarget(decelerationSequence.lastCheckpoint.distanceFromStart, decelerationSequence.lastCheckpoint.altitude, ManagedSpeedType.Descent);
 
         // Don't bother considering the climb step in the profile if we have already reached the target speed in the deceleration segment
-        if (currentSpeedTarget - decelerationSequence.lastCheckpoint.speed > 1) {
+        if (speedProfile.getTargetWithoutConstraints(decelerationSequence.lastCheckpoint.altitude, ManagedSpeedType.Descent) - decelerationSequence.lastCheckpoint.speed > 1) {
             sequence.addCheckpointFromStepBackwards(descentSegment, VerticalCheckpointReason.AltitudeConstraint);
         }
     }
@@ -278,7 +282,7 @@ export class ApproachPathBuilder {
                 if (remainingDistanceToConstraint > 0.1) {
                     // If we decelerated, but aren't at the constraint yet, fly level, at constant speed to the constraint
 
-                    const constantStep = strategy.predictToDistanceBackwards(
+                    const constantStep = this.levelFlightSegment(
                         altitude,
                         remainingDistanceToConstraint,
                         speedConstraint.maxSpeed,
@@ -352,6 +356,23 @@ export class ApproachPathBuilder {
         step.speed = speed;
 
         return step;
+    }
+
+    private levelFlightSegment(
+        altitude: Feet, distance: NauticalMiles, speed: Knots, mach: Mach, fuelOnBoard: number, headwindComponent: WindComponent, config?: AircraftConfiguration,
+    ): StepResults {
+        const { zeroFuelWeight } = this.observer.get();
+
+        return Predictions.levelFlightStep(
+            altitude,
+            distance,
+            speed,
+            mach,
+            zeroFuelWeight,
+            fuelOnBoard,
+            headwindComponent.value,
+            this.atmosphericConditions.isaDeviation,
+        );
     }
 
     private getFlapCheckpointReasonByFlapConf(flapConfig: FlapConf) {
